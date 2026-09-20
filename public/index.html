@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Local Classifieds Board</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="nav"></div>
+<div class="container">
+    <h1>Local Classifieds Board</h1>
+    <div class="filters">
+        <select id="categoryFilter">
+            <option value="">All Categories</option>
+        </select>
+        <select id="sortFilter">
+            <option value="newest">Newest First</option>
+            <option value="lowest_price">Lowest Price First</option>
+        </select>
+    </div>
+    <div id="adsList">Loading...</div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+renderNavbar('nav');
+
+async function loadAds() {
+    const category = document.getElementById('categoryFilter').value;
+    const sort = document.getElementById('sortFilter').value;
+    const params = new URLSearchParams();
+    if (category) params.set('category', category);
+    if (sort) params.set('sort', sort);
+
+    const res = await fetch('/api/ads?' + params.toString());
+    const data = await res.json();
+    const listEl = document.getElementById('adsList');
+
+    // Populate category dropdown once
+    const catSelect = document.getElementById('categoryFilter');
+    if (catSelect.options.length === 1 && data.categories) {
+        data.categories.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c; opt.textContent = c;
+            catSelect.appendChild(opt);
+        });
+    }
+
+    if (!data.ads || data.ads.length === 0) {
+        listEl.innerHTML = '<div class="empty-state">No ads found. Be the first to post one!</div>';
+        return;
+    }
+
+    listEl.innerHTML = data.ads.map(ad => `
+        <div class="ad-item ${ad.featured ? 'featured' : ''}">
+            <a class="ad-title" href="/ad.html?id=${ad.id}">${escapeHtml(ad.title)}</a>
+            ${ad.featured ? '<span class="badge gold">⭐ Featured</span>' : ''}
+            <div class="ad-meta">
+                <span class="badge">${ad.category}</span>
+                <span class="price-tag">${ad.price > 0 ? '₹' + ad.price : 'Free / Contact'}</span>
+                &middot; Posted by ${escapeHtml(ad.poster_name)}
+                &middot; ${ad.enquiry_count} enquiries
+            </div>
+        </div>
+    `).join('');
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+document.getElementById('categoryFilter').addEventListener('change', loadAds);
+document.getElementById('sortFilter').addEventListener('change', loadAds);
+loadAds();
+</script>
+</body>
+</html>

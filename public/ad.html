@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ad Details - Local Classifieds Board</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="nav"></div>
+<div class="container">
+    <a class="top-link" href="/index.html">&larr; Back to Board</a>
+    <div id="adDetail" class="card">Loading...</div>
+    <div id="ownerPanel"></div>
+    <div id="enquirySection" class="card"></div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+renderNavbar('nav');
+const adId = new URLSearchParams(window.location.search).get('id');
+let currentAd = null;
+let isOwner = false;
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+async function loadAd() {
+    const res = await fetch('/api/ads/' + adId, { headers: authHeaders() });
+    const data = await res.json();
+    const detailEl = document.getElementById('adDetail');
+
+    if (!res.ok) {
+        detailEl.innerHTML = '<div class="empty-state">' + (data.error || 'Ad not found.') + '</div>';
+        return;
+    }
+
+    currentAd = data.ad;
+    isOwner = data.isOwner;
+
+    detailEl.innerHTML = `
+        <h1>${escapeHtml(currentAd.title)} ${currentAd.featured ? '<span class="badge gold">⭐ Featured</span>' : ''}</h1>
+        <span class="badge">${currentAd.category}</span>
+        <span class="badge">${currentAd.status}</span>
+        <p style="margin-top:15px;">${escapeHtml(currentAd.description)}</p>
+        <p style="margin-top:10px;" class="price-tag">${currentAd.price > 0 ? '₹' + currentAd.price : 'Free / Contact for price'}</p>
+        <p class="ad-meta" style="margin-top:10px;">
+            Posted by ${escapeHtml(currentAd.poster_name)} on ${new Date(currentAd.posted_at).toLocaleDateString()}<br>
+            Expires on ${new Date(currentAd.expires_at).toLocaleDateString()}<br>
+            Contact: ${escapeHtml(currentAd.contact)}
+        </p>
+    `;
+
+    renderOwnerPanel();
+    renderEnquirySection();
+}
+
+function renderOwnerPanel() {
+    const panel = document.getElementById('ownerPanel');
+    if (!isOwner) { panel.innerHTML = ''; return; }
+
+    panel.innerHTML = `
+        <div class="card">
+            <h2>Manage Your Ad</h2>
+            ${currentAd.status === 'active' ? '<button class="btn danger" id="closeBtn">Mark as Closed</button>' : ''}
+            <button class="btn secondary" id="renewBtn">Renew Listing (+30 days)</button>
+            <button class="btn gold" id="featureBtn">${currentAd.featured ? 'Unfeature' : 'Feature (Pin to Top)'}</button>
+            <div id="ownerMsg" class="success-msg"></div>
+        </div>
+    `;
+
+    const closeBtn = document.getElementById('closeBtn');
+    if (closeBtn) closeBtn.addEventListener('click', async () => {
+        await fetch('/api/ads/' + adId + '/close', { method: 'PUT', headers: authHeaders() });
+        loadAd();
+    });
+
+    document.getElementById('renewBtn').addEventListener('click', async () => {
+        const res = await fetch('/api/ads/' + adId + '/renew', { method: 'PUT', headers: authHeaders() });
+        const data = await res.json();
+        document.getElementById('ownerMsg').textContent = data.message;
+        loadAd();
+    });
+
+    document.getElementById('featureBtn').addEventListener('click', async () => {
+        await fetch('/api/ads/' + adId + '/feature', { method: 'PUT', headers: authHeaders() });
+        loadAd();
+    });
+}
+
+async function renderEnquirySection() {
+    const section = document.getElementById('enquirySection');
+
+    if (isOwner) {
+        // Owner sees list of enquiries received
+        const res = await fetch('/api/enquiries/' + adId, { headers: authHeaders() });
+        const data = await res.json();
+        const enquiries = data.enquiries || [];
+        section.innerHTML = `
+            <h2>Enquiries Received (${enquiries.length})</h2>
+            ${enquiries.length === 0 ? '<p class="ad-meta">No enquiries yet.</p>' : enquiries.map(e => `
+                <div class="enquiry-item">
+                    <strong>${escapeHtml(e.name)}</strong> &middot; ${new Date(e.sent_at).toLocaleString()}
+                    <p>${escapeHtml(e.message)}</p>
+                </div>
+            `).join('')}
+        `;
+    } else {
+        // Visitor sees a form to send an enquiry
+        section.innerHTML = `
+            <h2>Send an Enquiry</h2>
+            <form id="enquiryForm">
+                <label>Your Name</label>
+                <input type="text" id="enqName" required>
+                <label>Message</label>
+                <textarea id="enqMessage" required></textarea>
+                <button class="btn" type="submit">Send Enquiry</button>
+                <div class="success-msg" id="enqMsg"></div>
+            </form>
+        `;
+        document.getElementById('enquiryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('enqName').value;
+            const message = document.getElementById('enqMessage').value;
+            const res = await fetch('/api/enquiries/' + adId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, message })
+            });
+            const data = await res.json();
+            const msgEl = document.getElementById('enqMsg');
+            msgEl.textContent = res.ok ? data.message : (data.error || 'Failed to send.');
+            if (res.ok) document.getElementById('enquiryForm').reset();
+        });
+    }
+}
+
+loadAd();
+</script>
+</body>
+</html>

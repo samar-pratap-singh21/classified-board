@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My Ads - Local Classifieds Board</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="nav"></div>
+<div class="container">
+    <a class="top-link" href="/index.html">&larr; Back to Board</a>
+    <h1>My Ads</h1>
+    <div id="myAdsList">Loading...</div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+renderNavbar('nav');
+requireLoginRedirect();
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+async function loadMyAds() {
+    const res = await fetch('/api/ads/mine', { headers: authHeaders() });
+    const data = await res.json();
+    const listEl = document.getElementById('myAdsList');
+
+    if (!data.ads || data.ads.length === 0) {
+        listEl.innerHTML = '<div class="empty-state">You have not posted any ads yet. <a href="/post-ad.html">Post one now</a>.</div>';
+        return;
+    }
+
+    listEl.innerHTML = data.ads.map(ad => `
+        <div class="ad-item ${ad.featured ? 'featured' : ''}">
+            <a class="ad-title" href="/ad.html?id=${ad.id}">${escapeHtml(ad.title)}</a>
+            <span class="badge">${ad.status}</span>
+            ${ad.featured ? '<span class="badge gold">⭐ Featured</span>' : ''}
+            <div class="ad-meta">
+                <span class="badge">${ad.category}</span>
+                <span class="price-tag">${ad.price > 0 ? '₹' + ad.price : 'Free / Contact'}</span>
+                &middot; ${ad.enquiry_count} enquiries
+                &middot; Expires ${new Date(ad.expires_at).toLocaleDateString()}
+            </div>
+        </div>
+    `).join('');
+}
+
+loadMyAds();
+</script>
+</body>
+</html>

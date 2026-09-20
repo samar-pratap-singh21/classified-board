@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Post an Ad - Local Classifieds Board</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div id="nav"></div>
+<div class="container">
+    <a class="top-link" href="/index.html">&larr; Back to Board</a>
+    <div class="card" style="max-width:600px;">
+        <h1>Post a Classified Ad</h1>
+        <form id="adForm">
+            <label>Title</label>
+            <input type="text" id="title" required>
+
+            <label>Category</label>
+            <select id="category" required>
+                <option value="For Sale">For Sale</option>
+                <option value="Services">Services</option>
+                <option value="Rentals">Rentals</option>
+                <option value="Jobs">Jobs</option>
+                <option value="Lost & Found">Lost & Found</option>
+            </select>
+
+            <label>Description</label>
+            <textarea id="description" required></textarea>
+
+            <label>Price (optional, leave 0 if not applicable)</label>
+            <input type="number" id="price" min="0" step="0.01" value="0">
+
+            <label>Contact Info (phone/email)</label>
+            <input type="text" id="contact" required>
+
+            <label style="display:flex;align-items:center;gap:8px;margin-top:15px;">
+                <input type="checkbox" id="featured" style="width:auto;"> Feature this ad (pin to top)
+            </label>
+
+            <button class="btn" type="submit">Post Ad</button>
+            <div class="error-msg" id="msg"></div>
+        </form>
+    </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+renderNavbar('nav');
+requireLoginRedirect();
+
+document.getElementById('adForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById('msg');
+    msg.textContent = '';
+
+    const payload = {
+        title: document.getElementById('title').value,
+        category: document.getElementById('category').value,
+        description: document.getElementById('description').value,
+        price: parseFloat(document.getElementById('price').value) || 0,
+        contact: document.getElementById('contact').value,
+        featured: document.getElementById('featured').checked
+    };
+
+    try {
+        const res = await fetch('/api/ads', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            msg.textContent = data.error || 'Could not post ad.';
+            return;
+        }
+        window.location.href = '/ad.html?id=' + data.adId;
+    } catch (err) {
+        msg.textContent = 'Could not connect to server.';
+    }
+});
+</script>
+</body>
+</html>
